@@ -1,6 +1,4 @@
-#ifdef CONFIG_SCHED_QHMP
-#include "qhmp_sched.h"
-#else
+
 #include <linux/sched.h>
 #include <linux/sched/sysctl.h>
 #include <linux/sched/rt.h>
@@ -26,19 +24,6 @@ extern __read_mostly int scheduler_running;
 
 extern unsigned long calc_load_update;
 extern atomic_long_t calc_load_tasks;
-
-struct freq_max_load_entry {
-	/* The maximum load which has accounted governor's headroom. */
-	u64 hdemand;
-};
-
-struct freq_max_load {
-	struct rcu_head rcu;
-	int length;
-	struct freq_max_load_entry freqs[0];
-};
-
-extern DEFINE_PER_CPU(struct freq_max_load *, freq_max_load);
 
 extern long calc_load_fold_active(struct rq *this_rq);
 extern void update_cpu_load_active(struct rq *this_rq);
@@ -224,11 +209,6 @@ struct cfs_bandwidth {
 struct task_group {
 	struct cgroup_subsys_state css;
 
-	bool notify_on_migrate;
-#ifdef CONFIG_SCHED_HMP
-	bool upmigrate_discouraged;
-#endif
-
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	/* schedulable entities of this group on each cpu */
 	struct sched_entity **se;
@@ -333,82 +313,6 @@ struct cfs_bandwidth { };
 
 #endif	/* CONFIG_CGROUP_SCHED */
 
-#ifdef CONFIG_SCHED_HMP
-
-struct hmp_sched_stats {
-	int nr_big_tasks;
-	u64 cumulative_runnable_avg;
-#ifdef CONFIG_SCHED_FREQ_INPUT
-	u64 pred_demands_sum;
-#endif
-};
-
-struct sched_cluster {
-	struct list_head list;
-	struct cpumask cpus;
-	int id;
-	int max_power_cost;
-	int min_power_cost;
-	int max_possible_capacity;
-	int capacity;
-	int efficiency; /* Differentiate cpus with different IPC capability */
-	int load_scale_factor;
-	unsigned int exec_scale_factor;
-	/*
-	 * max_freq = user maximum
-	 * max_mitigated_freq = thermal defined maximum
-	 * max_possible_freq = maximum supported by hardware
-	 */
-	unsigned int cur_freq, max_freq, max_mitigated_freq, min_freq;
-	unsigned int max_possible_freq;
-	bool freq_init_done;
-	int dstate, dstate_wakeup_latency, dstate_wakeup_energy;
-	unsigned int static_cluster_pwr_cost;
-};
-
-extern unsigned long all_cluster_ids[];
-
-static inline int cluster_first_cpu(struct sched_cluster *cluster)
-{
-	return cpumask_first(&cluster->cpus);
-}
-
-struct related_thread_group {
-	int id;
-	raw_spinlock_t lock;
-	struct list_head tasks;
-	struct list_head list;
-	struct sched_cluster *preferred_cluster;
-	struct rcu_head rcu;
-	u64 last_update;
-#ifdef CONFIG_SCHED_FREQ_INPUT
-	struct group_cpu_time __percpu *cpu_time;	/* one per cluster */
-#endif
-};
-
-struct migration_sum_data {
-	struct rq *src_rq, *dst_rq;
-#ifdef CONFIG_SCHED_FREQ_INPUT
-	struct group_cpu_time *src_cpu_time, *dst_cpu_time;
-#endif
-};
-
-extern struct list_head cluster_head;
-extern int num_clusters;
-extern struct sched_cluster *sched_cluster[NR_CPUS];
-extern int group_will_fit(struct sched_cluster *cluster,
-		 struct related_thread_group *grp, u64 demand);
-
-struct cpu_cycle {
-	u64 cycles;
-	u64 time;
-};
-
-#define for_each_sched_cluster(cluster) \
-	list_for_each_entry_rcu(cluster, &cluster_head, list)
-
-#endif
-
 /* CFS-related fields in a runqueue */
 struct cfs_rq {
 	struct load_weight load;
@@ -478,11 +382,6 @@ struct cfs_rq {
 	struct task_group *tg;	/* group that "owns" this runqueue */
 
 #ifdef CONFIG_CFS_BANDWIDTH
-
-#ifdef CONFIG_SCHED_HMP
-	struct hmp_sched_stats hmp_stats;
-#endif
-
 	int runtime_enabled;
 	u64 runtime_expires;
 	s64 runtime_remaining;
@@ -686,7 +585,6 @@ struct rq {
 	int post_schedule;
 	int active_balance;
 	int push_cpu;
-	struct task_struct *push_task;
 	struct cpu_stop_work active_balance_work;
 	/* cpu of this runqueue: */
 	int cpu;
@@ -704,6 +602,7 @@ struct rq {
 	u64 max_idle_balance_cost;
 #endif
 
+<<<<<<< HEAD
 #ifdef CONFIG_SCHED_HMP
 	struct sched_cluster *cluster;
 	struct cpumask freq_domain_cpumask;
@@ -733,6 +632,8 @@ struct rq {
 	u64 nt_prev_runnable_sum;
 #endif
 
+=======
+>>>>>>> a5ef960... sched: Revert HMP and some MSM specific features
 #ifdef CONFIG_IRQ_TIME_ACCOUNTING
 	u64 prev_irq_time;
 #endif
@@ -946,6 +847,7 @@ static inline void sched_ttwu_pending(void) { }
 #include "stats.h"
 #include "auto_group.h"
 
+<<<<<<< HEAD
 extern void init_new_task_load(struct task_struct *p);
 
 #ifdef CONFIG_SCHED_HMP
@@ -1401,6 +1303,8 @@ static inline void clear_reserved(int cpu) { }
 
 #endif /* CONFIG_SCHED_HMP */
 
+=======
+>>>>>>> a5ef960... sched: Revert HMP and some MSM specific features
 #ifdef CONFIG_CGROUP_SCHED
 
 /*
@@ -1419,11 +1323,6 @@ static inline void clear_reserved(int cpu) { }
 static inline struct task_group *task_group(struct task_struct *p)
 {
 	return p->sched_task_group;
-}
-
-static inline bool task_notify_on_migrate(struct task_struct *p)
-{
-	return task_group(p)->notify_on_migrate;
 }
 
 /* Change a task's cfs_rq and parent entity if it moves across CPUs/groups */
@@ -1451,10 +1350,7 @@ static inline struct task_group *task_group(struct task_struct *p)
 {
 	return NULL;
 }
-static inline bool task_notify_on_migrate(struct task_struct *p)
-{
-	return false;
-}
+
 #endif /* CONFIG_CGROUP_SCHED */
 
 static inline void __set_task_cpu(struct task_struct *p, unsigned int cpu)
@@ -1704,7 +1600,13 @@ static const u32 prio_to_wmult[40] = {
 #else
 #define ENQUEUE_WAKING		0x00
 #endif
+<<<<<<< HEAD
 #define ENQUEUE_MIGRATING	0x40
+=======
+#define ENQUEUE_REPLENISH	8
+
+#define DEQUEUE_SLEEP		1
+>>>>>>> a5ef960... sched: Revert HMP and some MSM specific features
 
 #define RETRY_TASK		((void *)-1UL)
 
@@ -1762,12 +1664,6 @@ struct sched_class {
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	void (*task_move_group) (struct task_struct *p, int on_rq);
-#endif
-#ifdef CONFIG_SCHED_HMP
-	void (*inc_hmp_sched_stats)(struct rq *rq, struct task_struct *p);
-	void (*dec_hmp_sched_stats)(struct rq *rq, struct task_struct *p);
-	void (*fixup_hmp_sched_stats)(struct rq *rq, struct task_struct *p,
-				      u32 new_task_load, u32 new_pred_demand);
 #endif
 };
 
@@ -1827,9 +1723,7 @@ static inline struct cpuidle_state *idle_get_state(struct rq *rq)
 }
 #endif
 
-#ifdef CONFIG_SYSRQ_SCHED_DEBUG
 extern void sysrq_sched_debug_show(void);
-#endif
 extern void sched_init_granularity(void);
 extern void update_max_interval(void);
 
@@ -1858,7 +1752,6 @@ static inline void add_nr_running(struct rq *rq, unsigned count)
 {
 	unsigned prev_nr = rq->nr_running;
 
-	sched_update_nr_prod(cpu_of(rq), count, true);
 	rq->nr_running = prev_nr + count;
 
 	if (prev_nr < 2 && rq->nr_running >= 2) {
@@ -1885,7 +1778,6 @@ static inline void add_nr_running(struct rq *rq, unsigned count)
 
 static inline void sub_nr_running(struct rq *rq, unsigned count)
 {
-	sched_update_nr_prod(cpu_of(rq), count, false);
 	rq->nr_running -= count;
 }
 
@@ -2205,4 +2097,3 @@ static inline u64 irq_time_read(int cpu)
 }
 #endif /* CONFIG_64BIT */
 #endif /* CONFIG_IRQ_TIME_ACCOUNTING */
-#endif /* CONFIG_SCHED_QHMP */
