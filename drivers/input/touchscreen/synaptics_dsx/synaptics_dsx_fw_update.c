@@ -20,6 +20,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/mutex.h>
 #include <linux/delay.h>
 #include <linux/input.h>
 #include <linux/firmware.h>
@@ -357,7 +358,12 @@ static struct device_attribute attrs[] = {
 
 static struct synaptics_rmi4_fwu_handle *fwu;
 
+<<<<<<< HEAD
 DECLARE_COMPLETION(fwu_dsx_remove_complete);
+=======
+DECLARE_COMPLETION(fwu_remove_complete);
+DEFINE_MUTEX(fwu_sysfs_mutex);
+>>>>>>> d4d941b... input: touchscreen: Synaptics: prevent sysfs races
 
 static unsigned int extract_uint_le(const unsigned char *ptr)
 {
@@ -1582,7 +1588,49 @@ int synaptics_dsx_fw_updater(unsigned char *fw_data)
 
 	return retval;
 }
+<<<<<<< HEAD
 EXPORT_SYMBOL(synaptics_dsx_fw_updater);
+=======
+EXPORT_SYMBOL(synaptics_fw_updater);
+
+#ifdef DO_STARTUP_FW_UPDATE
+static void fwu_startup_fw_update_work(struct work_struct *work)
+{
+	static unsigned char do_once = 1;
+#ifdef WAIT_FOR_FB_READY
+	unsigned int timeout;
+	struct synaptics_rmi4_data *rmi4_data = fwu->rmi4_data;
+#endif
+
+	if (!do_once)
+		return;
+	do_once = 0;
+
+#ifdef WAIT_FOR_FB_READY
+	timeout = FB_READY_TIMEOUT_S * 1000 / FB_READY_WAIT_MS + 1;
+
+	while (!rmi4_data->fb_ready) {
+		msleep(FB_READY_WAIT_MS);
+		timeout--;
+		if (timeout == 0) {
+			dev_err(rmi4_data->pdev->dev.parent,
+					"%s: Timed out waiting for FB ready\n",
+					__func__);
+			return;
+		}
+	}
+#endif
+	/* Prevent sysfs operations during initial update. */
+	mutex_lock(&fwu_sysfs_mutex);
+
+	synaptics_fw_updater(NULL);
+
+	mutex_unlock(&fwu_sysfs_mutex);
+
+	return;
+}
+#endif
+>>>>>>> d4d941b... input: touchscreen: Synaptics: prevent sysfs races
 
 static ssize_t fwu_sysfs_show_image(struct file *data_file,
 		struct kobject *kobj, struct bin_attribute *attributes,
@@ -1590,29 +1638,68 @@ static ssize_t fwu_sysfs_show_image(struct file *data_file,
 {
 	struct synaptics_rmi4_data *rmi4_data = fwu->rmi4_data;
 
+	if (!mutex_trylock(&fwu_sysfs_mutex))
+		return -EBUSY;
+
 	if (count < fwu->config_size) {
 		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Not enough space (%zu bytes) in buffer\n",
 				__func__, count);
-		return -EINVAL;
+		retval = -EINVAL;
+		goto show_image_exit;
 	}
 
+<<<<<<< HEAD
 	memcpy(buf, fwu->read_config_buf, fwu->config_size);
+=======
+	retval = secure_memcpy(buf, count, fwu->read_config_buf,
+			fwu->read_config_buf_size, fwu->config_size);
+	if (retval < 0) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to copy config data\n",
+				__func__);
+		goto show_image_exit;
+	}
+>>>>>>> d4d941b... input: touchscreen: Synaptics: prevent sysfs races
 
-	return fwu->config_size;
+	retval = fwu->config_size;
+
+show_image_exit:
+	mutex_unlock(&fwu_sysfs_mutex);
+	return retval;
 }
 
 static ssize_t fwu_sysfs_store_image(struct file *data_file,
 		struct kobject *kobj, struct bin_attribute *attributes,
 		char *buf, loff_t pos, size_t count)
 {
+<<<<<<< HEAD
 	memcpy((void *)(&fwu->ext_data_source[fwu->data_pos]),
 			(const void *)buf,
 			count);
+=======
+	int retval;
+	struct synaptics_rmi4_data *rmi4_data = fwu->rmi4_data;
+
+	if (!mutex_trylock(&fwu_sysfs_mutex))
+		return -EBUSY;
+
+	retval = secure_memcpy(&fwu->ext_data_source[fwu->data_pos],
+			fwu->image_size - fwu->data_pos, buf, count, count);
+	if (retval < 0) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to copy image data\n",
+				__func__);
+		goto store_image_exit;
+	}
+>>>>>>> d4d941b... input: touchscreen: Synaptics: prevent sysfs races
 
 	fwu->data_pos += count;
+	retval = count;
 
-	return count;
+store_image_exit:
+	mutex_unlock(&fwu_sysfs_mutex);
+	return retval;
 }
 
 static ssize_t fwu_sysfs_force_reflash_store(struct device *dev,
@@ -1622,18 +1709,30 @@ static ssize_t fwu_sysfs_force_reflash_store(struct device *dev,
 	unsigned int input;
 	struct synaptics_rmi4_data *rmi4_data = fwu->rmi4_data;
 
+	if (!mutex_trylock(&fwu_sysfs_mutex))
+		return -EBUSY;
+
 	if (sscanf(buf, "%u", &input) != 1) {
 		retval = -EINVAL;
-		goto exit;
+		goto do_recovery_store_exit;
 	}
 
 	if (input != 1) {
 		retval = -EINVAL;
-		goto exit;
+		goto do_recovery_store_exit;
 	}
 
+<<<<<<< HEAD
 	if (LOCKDOWN)
 		fwu->do_lockdown = true;
+=======
+	if (!fwu->ext_data_source) {
+		retval = -EINVAL;
+		goto do_recovery_store_exit;
+	}
+	else
+		fwu->image = fwu->ext_data_source;
+>>>>>>> d4d941b... input: touchscreen: Synaptics: prevent sysfs races
 
 	fwu->force_update = true;
 	retval = synaptics_dsx_fw_updater(fwu->ext_data_source);
@@ -1641,15 +1740,26 @@ static ssize_t fwu_sysfs_force_reflash_store(struct device *dev,
 		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to do reflash\n",
 				__func__);
-		goto exit;
+		goto free_data_source_recovery_exit;
 	}
 
 	retval = count;
+<<<<<<< HEAD
 exit:
 	kfree(fwu->ext_data_source);
 	fwu->ext_data_source = NULL;
 	fwu->force_update = FORCE_UPDATE;
 	fwu->do_lockdown = DO_LOCKDOWN;
+=======
+
+free_data_source_recovery_exit:
+	kfree(fwu->ext_data_source);
+	fwu->ext_data_source = NULL;
+	fwu->image = NULL;
+
+do_recovery_store_exit:
+	mutex_unlock(&fwu_sysfs_mutex);
+>>>>>>> d4d941b... input: touchscreen: Synaptics: prevent sysfs races
 	return retval;
 }
 
@@ -1660,11 +1770,30 @@ static ssize_t fwu_sysfs_do_reflash_store(struct device *dev,
 	unsigned int input;
 	struct synaptics_rmi4_data *rmi4_data = fwu->rmi4_data;
 
+	if (!mutex_trylock(&fwu_sysfs_mutex))
+		return -EBUSY;
+
 	if (sscanf(buf, "%u", &input) != 1) {
 		retval = -EINVAL;
-		goto exit;
+		goto reflash_store_exit;
 	}
 
+<<<<<<< HEAD
+=======
+	if (fwu->in_ub_mode) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: In microbootloader mode\n",
+				__func__);
+		retval = -EINVAL;
+		goto reflash_store_exit;
+	}
+
+	if (!fwu->ext_data_source)
+		return -EINVAL;
+	else
+		fwu->image = fwu->ext_data_source;
+
+>>>>>>> d4d941b... input: touchscreen: Synaptics: prevent sysfs races
 	if (input & LOCKDOWN) {
 		fwu->do_lockdown = true;
 		input &= ~LOCKDOWN;
@@ -1672,7 +1801,7 @@ static ssize_t fwu_sysfs_do_reflash_store(struct device *dev,
 
 	if ((input != NORMAL) && (input != FORCE)) {
 		retval = -EINVAL;
-		goto exit;
+		goto reflash_store_exit;
 	}
 
 	if (input == FORCE)
@@ -1683,16 +1812,19 @@ static ssize_t fwu_sysfs_do_reflash_store(struct device *dev,
 		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to do reflash\n",
 				__func__);
-		goto exit;
+		goto reflash_store_free_exit;
 	}
 
 	retval = count;
 
-exit:
+reflash_store_free_exit:
 	kfree(fwu->ext_data_source);
 	fwu->ext_data_source = NULL;
 	fwu->force_update = FORCE_UPDATE;
 	fwu->do_lockdown = DO_LOCKDOWN;
+
+reflash_store_exit:
+	mutex_unlock(&fwu_sysfs_mutex);
 	return retval;
 }
 
@@ -1703,29 +1835,56 @@ static ssize_t fwu_sysfs_write_config_store(struct device *dev,
 	unsigned int input;
 	struct synaptics_rmi4_data *rmi4_data = fwu->rmi4_data;
 
+	if (!mutex_trylock(&fwu_sysfs_mutex))
+		return -EBUSY;
+
 	if (sscanf(buf, "%u", &input) != 1) {
 		retval = -EINVAL;
-		goto exit;
+		goto write_config_store_exit;
 	}
 
 	if (input != 1) {
 		retval = -EINVAL;
-		goto exit;
+		goto write_config_store_exit;
 	}
 
+<<<<<<< HEAD
+=======
+	if (fwu->in_ub_mode) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: In microbootloader mode\n",
+				__func__);
+		retval = -EINVAL;
+		goto write_config_store_exit;
+	}
+
+	if (!fwu->ext_data_source) {
+		retval = -EINVAL;
+		goto write_config_store_exit;
+	} else {
+		fwu->image = fwu->ext_data_source;
+	}
+>>>>>>> d4d941b... input: touchscreen: Synaptics: prevent sysfs races
 	retval = fwu_start_write_config();
 	if (retval < 0) {
 		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to write config\n",
 				__func__);
-		goto exit;
+		goto write_config_store_free_exit;
 	}
 
 	retval = count;
 
-exit:
+write_config_store_free_exit:
 	kfree(fwu->ext_data_source);
 	fwu->ext_data_source = NULL;
+<<<<<<< HEAD
+=======
+	fwu->image = NULL;
+
+write_config_store_exit:
+	mutex_unlock(&fwu_sysfs_mutex);
+>>>>>>> d4d941b... input: touchscreen: Synaptics: prevent sysfs races
 	return retval;
 }
 
@@ -1742,7 +1901,21 @@ static ssize_t fwu_sysfs_read_config_store(struct device *dev,
 	if (input != 1)
 		return -EINVAL;
 
+<<<<<<< HEAD
+=======
+	if (fwu->in_ub_mode) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: In microbootloader mode\n",
+				__func__);
+		return -EINVAL;
+	}
+
+	if (!mutex_trylock(&fwu_sysfs_mutex))
+		return -EBUSY;
+>>>>>>> d4d941b... input: touchscreen: Synaptics: prevent sysfs races
 	retval = fwu_do_read_config();
+	mutex_unlock(&fwu_sysfs_mutex);
+
 	if (retval < 0) {
 		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to read config\n",
@@ -1763,7 +1936,10 @@ static ssize_t fwu_sysfs_config_area_store(struct device *dev,
 	if (retval)
 		return retval;
 
+	if (!mutex_trylock(&fwu_sysfs_mutex))
+		return -EBUSY;
 	fwu->config_area = config_area;
+	mutex_unlock(&fwu_sysfs_mutex);
 
 	return count;
 }
@@ -1781,8 +1957,26 @@ static ssize_t fwu_sysfs_image_name_show(struct device *dev,
 static ssize_t fwu_sysfs_image_name_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
+<<<<<<< HEAD
 	if (sscanf(buf, "%s", fwu->image_name) != 1)
 		return -EINVAL;
+=======
+	int retval;
+	struct synaptics_rmi4_data *rmi4_data = fwu->rmi4_data;
+
+	if (!mutex_trylock(&fwu_sysfs_mutex))
+		return -EBUSY;
+	retval = secure_memcpy(fwu->image_name, MAX_IMAGE_NAME_LEN,
+			buf, count, count);
+	mutex_unlock(&fwu_sysfs_mutex);
+
+	if (retval < 0) {
+		dev_err(rmi4_data->pdev->dev.parent,
+				"%s: Failed to copy image file name\n",
+				__func__);
+		return retval;
+	}
+>>>>>>> d4d941b... input: touchscreen: Synaptics: prevent sysfs races
 
 	return count;
 }
@@ -1798,11 +1992,16 @@ static ssize_t fwu_sysfs_image_size_store(struct device *dev,
 	if (retval)
 		return retval;
 
+	if (!mutex_trylock(&fwu_sysfs_mutex))
+		return -EBUSY;
+
 	fwu->image_size = size;
 	fwu->data_pos = 0;
 
 	kfree(fwu->ext_data_source);
 	fwu->ext_data_source = kzalloc(fwu->image_size, GFP_KERNEL);
+	mutex_unlock(&fwu_sysfs_mutex);
+
 	if (!fwu->ext_data_source) {
 		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to alloc mem for image data\n",
@@ -1856,15 +2055,33 @@ static ssize_t fwu_sysfs_config_id_show(struct device *dev,
 	unsigned char config_id[4];
 	int retval;
 
+<<<<<<< HEAD
 	/* device config id */
 	retval = synaptics_rmi4_reg_read(rmi4_data,
 				fwu->f34_fd.ctrl_base_addr,
 				config_id,
 				sizeof(config_id));
 	if (retval < 0) {
+=======
+	if (!mutex_trylock(&fwu_sysfs_mutex))
+		return -EBUSY;
+
+	if (sscanf(buf, "%u", &input) != 1) {
+		retval = -EINVAL;
+		goto write_guest_code_store_exit;
+	}
+
+	if (input != 1) {
+		retval = -EINVAL;
+		goto write_guest_code_store_exit;
+	}
+
+	if (fwu->in_ub_mode) {
+>>>>>>> d4d941b... input: touchscreen: Synaptics: prevent sysfs races
 		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to read device config ID\n",
 				__func__);
+<<<<<<< HEAD
 		return retval;
 	}
 
@@ -1884,17 +2101,45 @@ static ssize_t fwu_sysfs_package_id_show(struct device *dev,
 			rmi4_data->f01_query_base_addr + F01_PACKAGE_ID_OFFSET,
 			package_id,
 			sizeof(package_id));
+=======
+		retval = -EINVAL;
+		goto write_guest_code_store_exit;
+	}
+
+	if (!fwu->ext_data_source) {
+		retval = -EINVAL;
+		goto write_guest_code_store_exit;
+	} else {
+		fwu->image = fwu->ext_data_source;
+	}
+>>>>>>> d4d941b... input: touchscreen: Synaptics: prevent sysfs races
 
 	if (retval < 0) {
 		dev_err(rmi4_data->pdev->dev.parent,
 				"%s: Failed to read device package ID\n",
 				__func__);
+<<<<<<< HEAD
 		return retval;
 	}
 
 	return snprintf(buf, PAGE_SIZE, "%d rev %d\n",
 			(package_id[1] << 8) | package_id[0],
 			(package_id[3] << 8) | package_id[2]);
+=======
+		goto write_guest_code_store_free_exit;
+	}
+
+	retval = count;
+
+write_guest_code_store_free_exit:
+	kfree(fwu->ext_data_source);
+	fwu->ext_data_source = NULL;
+	fwu->image = NULL;
+
+write_guest_code_store_exit:
+	mutex_unlock(&fwu_sysfs_mutex);
+	return retval;
+>>>>>>> d4d941b... input: touchscreen: Synaptics: prevent sysfs races
 }
 
 static void synaptics_rmi4_fwu_attn(struct synaptics_rmi4_data *rmi4_data,
