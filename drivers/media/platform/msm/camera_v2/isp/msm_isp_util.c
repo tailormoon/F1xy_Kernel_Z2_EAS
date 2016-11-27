@@ -257,6 +257,7 @@ uint32_t msm_isp_get_framedrop_period(
 int msm_isp_get_clk_info(struct vfe_device *vfe_dev,
 	struct platform_device *pdev, struct msm_cam_clk_info *vfe_clk_info)
 {
+
 	uint32_t count;
 	int i, rc;
 	uint32_t rates[VFE_CLK_INFO_MAX];
