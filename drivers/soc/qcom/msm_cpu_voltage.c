@@ -14,6 +14,7 @@
 #include <linux/cpu.h>
 #include <linux/pm_opp.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <soc/qcom/msm_cpu_voltage.h>
 
 #define MAX_FREQ_GAP_KHZ 200000
@@ -138,3 +139,85 @@ exit:
 	return target_freq;
 }
 EXPORT_SYMBOL(msm_match_cpu_voltage_btol);
+
+/**
+ * get_cpu_available_volts - show frequency voltages for the specified CPU
+ */
+static int get_cpu_available_volts(int cpu, char *buf)
+{
+	int cnt = 0;
+	struct dev_pm_opp *opp = NULL;
+	struct device *cls0_dev = NULL;
+	unsigned long freq = 0;
+	unsigned long temp_volt = 0;
+	int i, max_opps_cls0 = 0;
+
+	cls0_dev = get_cpu_device(cpu);
+	if (!cls0_dev) {
+		pr_err("Error getting CPU[%d] device\n", cpu);
+		return 0;
+	}
+	rcu_read_lock();
+	max_opps_cls0 = dev_pm_opp_get_opp_count(cls0_dev);
+	if (max_opps_cls0 <= 0)
+		pr_err("Error getting OPP count for CPU[%d]\n", cpu);
+	for (i = 0, freq = 0; i < max_opps_cls0; i++, freq++) {
+		opp = dev_pm_opp_find_freq_ceil(cls0_dev, &freq);
+		if (IS_ERR(opp)) {
+			pr_err("Error getting OPP freq on cluster [%d]\n", cpu);
+			goto exit;
+		}
+		temp_volt = dev_pm_opp_get_voltage(opp);
+		cnt += snprintf(buf + cnt, PAGE_SIZE - cnt,
+				"%lu ", temp_volt);
+	}
+	cnt += snprintf(buf + cnt, PAGE_SIZE - cnt, "\n");
+
+exit:
+	rcu_read_unlock();
+	return cnt;
+}
+
+static int get_cpu0_available_volts(char *buf, const struct kernel_param *kp)
+{
+	return get_cpu_available_volts(0, buf);
+}
+
+static const struct kernel_param_ops param_ops_available_volts_cpu0 = {
+	.get = get_cpu0_available_volts,
+};
+module_param_cb(cpu0_available_volts, &param_ops_available_volts_cpu0,
+							NULL, 0444);
+
+static int get_cpu1_available_volts(char *buf, const struct kernel_param *kp)
+{
+	return get_cpu_available_volts(1, buf);
+}
+
+static const struct kernel_param_ops param_ops_available_volts_cpu1 = {
+	.get = get_cpu1_available_volts,
+};
+module_param_cb(cpu1_available_volts, &param_ops_available_volts_cpu1,
+							NULL, 0444);
+
+static int get_cpu2_available_volts(char *buf, const struct kernel_param *kp)
+{
+	return get_cpu_available_volts(2, buf);
+}
+
+static const struct kernel_param_ops param_ops_available_volts_cpu2 = {
+	.get = get_cpu2_available_volts,
+};
+module_param_cb(cpu2_available_volts, &param_ops_available_volts_cpu2,
+							NULL, 0444);
+
+static int get_cpu3_available_volts(char *buf, const struct kernel_param *kp)
+{
+	return get_cpu_available_volts(3, buf);
+}
+
+static const struct kernel_param_ops param_ops_available_volts_cpu3 = {
+	.get = get_cpu3_available_volts,
+};
+module_param_cb(cpu3_available_volts, &param_ops_available_volts_cpu3,
+							NULL, 0444);
