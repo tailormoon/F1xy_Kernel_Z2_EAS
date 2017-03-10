@@ -205,8 +205,8 @@ static void fpc1020_report_work_func(struct work_struct *work)
 	if (fpc1020->screen_on == 1) {
 		pr_info("Report key value = %d\n", (int)fpc1020->report_key);
 		input_report_key(fpc1020->input_dev, fpc1020->report_key, 1);
-		input_sync(fpc1020->input_dev);
-		mdelay(30);
+		mdelay(10);
+  		input_sync(fpc1020->input_dev);
 		input_report_key(fpc1020->input_dev, fpc1020->report_key, 0);
 		input_sync(fpc1020->input_dev);
 		fpc1020->report_key = 0;
