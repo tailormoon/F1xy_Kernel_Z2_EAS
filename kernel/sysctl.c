@@ -100,7 +100,7 @@
 extern int deny_new_usb;
 #endif
 extern int max_threads;
-ex1tern int suid_dumpable;
+extern int suid_dumpable;
 #ifdef CONFIG_COREDUMP
 extern int core_uses_pid;
 extern char core_pattern[];
