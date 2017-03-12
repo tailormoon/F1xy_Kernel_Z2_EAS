@@ -246,7 +246,8 @@ static inline int check_valid_pointer(struct kmem_cache *s,
 static inline void *get_freepointer(struct kmem_cache *s, void *object)
 {
 	unsigned long freepointer_addr = (unsigned long)object + s->offset;
-	return (void *)(*(unsigned long *)freepointer_addr ^ s->random ^ freepointer_addr);}
+	return (void *)(*(unsigned long *)freepointer_addr ^ s->random ^ freepointer_addr);
+}
 
 static void prefetch_freepointer(const struct kmem_cache *s, void *object)
 {
