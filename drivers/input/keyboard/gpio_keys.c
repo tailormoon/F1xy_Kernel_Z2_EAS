@@ -1025,11 +1025,6 @@ bool home_button_pressed(void)
 	}
 }
 
-bool home_button_pressed(void)
-{
-	return true;
-}
-
 late_initcall(gpio_keys_init);
 module_exit(gpio_keys_exit);
 
