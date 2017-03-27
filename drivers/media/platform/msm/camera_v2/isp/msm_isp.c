@@ -620,8 +620,6 @@ int vfe_hw_probe(struct platform_device *pdev)
 
 probe_fail3:
 	kfree(vfe_dev->ub_info);
-probe_fail2:
-	kfree(vfe_dev->stats);
 probe_fail1:
 	kfree(vfe_dev);
 end:
