@@ -482,7 +482,7 @@ static int vfe_probe(struct platform_device *pdev)
 		if (!node) {
 			pr_err("%s: Error! Cannot find node in dtsi %s\n",
 				__func__, name);
-			goto probe_fail2;
+			goto end;
 		}
 		new_dev = of_find_device_by_node(node);
 		if (!new_dev) {
@@ -524,7 +524,7 @@ int vfe_hw_probe(struct platform_device *pdev)
 	if (!vfe_dev->ub_info) {
 		pr_err("%s: no enough memory\n", __func__);
 		rc = -ENOMEM;
-		goto probe_fail2;
+		goto end;
 	}
 
 	if (pdev->dev.of_node) {
