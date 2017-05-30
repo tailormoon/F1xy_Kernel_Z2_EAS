@@ -1,3 +1,5 @@
+CFLAGS_lazyplug.o	    		+= -finline-functions
+
 # CPUfreq core
 obj-$(CONFIG_CPU_FREQ)			+= cpufreq.o freq_table.o
 
@@ -11,11 +13,17 @@ obj-$(CONFIG_CPU_FREQ_GOV_USERSPACE)	+= cpufreq_userspace.o
 obj-$(CONFIG_CPU_FREQ_GOV_ONDEMAND)	+= cpufreq_ondemand.o
 obj-$(CONFIG_CPU_FREQ_GOV_CONSERVATIVE)	+= cpufreq_conservative.o
 obj-$(CONFIG_CPU_FREQ_GOV_INTERACTIVE)	+= cpufreq_interactive.o
-obj-$(CONFIG_CPU_FREQ_GOV_COMMON)		+= cpufreq_governor.o
+obj-$(CONFIG_CPU_FREQ_GOV_COMMON)	+= cpufreq_governor.o
+obj-$(CONFIG_CPU_FREQ_GOV_IMPULSE)      += cpufreq_impulse.o
+obj-$(CONFIG_CPU_FREQ_GOV_NIGHTMARE)	+= cpufreq_nightmare.o
+obj-$(CONFIG_CPU_FREQ_GOV_DARKNESS)	+= cpufreq_darkness.o
 obj-$(CONFIG_CPU_BOOST)			+= cpu-boost.o
 
 obj-$(CONFIG_CPUFREQ_DT)		+= cpufreq-dt.o
-
+obj-$(CONFIG_ZEN_DECISION) 		+= msm_zen_decision.o
+obj-$(CONFIG_BRICKED_HOTPLUG) 		+= bricked_hotplug.o
+obj-$(CONFIG_LAZYPLUG)			+= lazyplug.o
+obj-$(CONFIG_CPU_FREQ_GOV_DARKNESS)     += cpufreq_darkness.o
 ##################################################################################
 # x86 drivers.
 # Link order matters. K8 is preferred to ACPI because of firmware bugs in early
