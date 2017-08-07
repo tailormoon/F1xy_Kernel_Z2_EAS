@@ -11,8 +11,8 @@ export objdir="${HOME}/obj"
 export sourcedir="${HOME}/Z2EAS"
 cd $sourcedir
 compile() {
-  make O=$objdir ARCH=arm64 CROSS_COMPILE=${TOOL_CHAIN_PATH}/${CROSS_COMPILE}  $CONFIG_FILE -j4 
-  make O=$objdir -j6
+  make O=$objdir ARCH=arm64 CROSS_COMPILE=${TOOL_CHAIN_PATH}/${CROSS_COMPILE}  $CONFIG_FILE -j9
+  make O=$objdir -j9
 }
 module(){
   mkdir modules
